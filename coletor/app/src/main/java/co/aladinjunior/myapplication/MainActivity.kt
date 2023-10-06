@@ -1,6 +1,7 @@
 package co.aladinjunior.myapplication
 
 import android.Manifest
+import android.content.DialogInterface
 import android.content.pm.PackageManager
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -21,6 +22,8 @@ import com.journeyapps.barcodescanner.ScanOptions
 import java.io.File
 import java.io.FileOutputStream
 import java.lang.Exception
+import java.text.SimpleDateFormat
+import java.util.*
 
 class MainActivity : AppCompatActivity() {
 
@@ -32,7 +35,10 @@ class MainActivity : AppCompatActivity() {
         writePermissionGranted()
 
         Log.d("file", filesDir.path)
-        Log.d("file", "/storage/emulated/0/Download")
+        Log.d(
+            "file",
+            SimpleDateFormat(DATE_PATTERN, Locale.getDefault()).format(System.currentTimeMillis())
+        )
 
 
 
@@ -42,15 +48,12 @@ class MainActivity : AppCompatActivity() {
             scan()
 
 
-
-
-
         }
 
 
     }
 
-    private fun writeFile(content: String){
+    private fun writeFile(content: String) {
         val fileName = "arquivo.txt"
 //        val content = "Conteúdo do arquivo de texto. 2 "
 
@@ -68,16 +71,20 @@ class MainActivity : AppCompatActivity() {
                 outputStream.write(content.toByteArray())
             }
 
-            Toast.makeText(this, "Arquivo criado e conteúdo escrito em: ${file.absolutePath}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this,
+                "Arquivo criado e conteúdo escrito em: ${file.absolutePath}",
+                Toast.LENGTH_SHORT
+            ).show()
 
-            Log.d("file","Arquivo criado e conteúdo escrito em: ${file.absolutePath}")
+            Log.d("file", "Arquivo criado e conteúdo escrito em: ${file.absolutePath}")
         } catch (e: Exception) {
             Toast.makeText(this, "Arquivo não criado", Toast.LENGTH_SHORT).show()
             Log.e("error", "Ocorreu um erro ao criar o arquivo: ${e.message}")
         }
     }
 
-    private fun scan(){
+    private fun scan() {
         val options = ScanOptions().apply {
             setPrompt("Volume para cima para ligar o flash!")
             setBeepEnabled(true)
@@ -90,42 +97,56 @@ class MainActivity : AppCompatActivity() {
         barLauncher.launch(options)
     }
 
-    private val barLauncher: ActivityResultLauncher<ScanOptions> = registerForActivityResult(ScanContract(), object : ActivityResultCallback<ScanIntentResult>{
-        override fun onActivityResult(result: ScanIntentResult?) {
+    private val barLauncher: ActivityResultLauncher<ScanOptions> = registerForActivityResult(
+        ScanContract(),
+        object : ActivityResultCallback<ScanIntentResult> {
+            override fun onActivityResult(result: ScanIntentResult?) {
+                val date = SimpleDateFormat(DATE_PATTERN, Locale.getDefault()).format(System.currentTimeMillis())
+                val editText = EditText(this@MainActivity)
+                val params = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                editText.layoutParams = params
 
-             val editText = EditText(this@MainActivity)
-             val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-              )
-            editText.layoutParams = params
+                if (result?.contents != null) {
+                    val builder = AlertDialog.Builder(this@MainActivity)
+                    builder.setTitle("quantidade")
+                    builder.setView(editText)
+                    builder.setMessage(result.contents)
 
-            if (result?.contents != null){
-                val builder = AlertDialog.Builder(this@MainActivity)
-                builder.setTitle("quantidade")
-                builder.setView(editText)
-                builder.setMessage(result.contents)
-                val quantity = editText.text.toString()
-                builder.show()
-                if (writePermissionGranted()){
-                    
-                    writeFile(result.contents + "0000" + quantity + "0000000" + "DATA DE HOJE")
+                    builder.setPositiveButton("OK", object : DialogInterface.OnClickListener{
+                        override fun onClick(dialog: DialogInterface?, which: Int) {
+                            if (writePermissionGranted()) {
+                                var quantity = editText.text.toString()
+                                if (quantity.length < 2) {
+                                    quantity = "0" + editText.text.toString()
+                                }
+                                val finalResult = result.contents + "0000" + quantity + "0000000" + date
+                                Log.d("file2", finalResult)
 
-                } else {
-                    permissionGranted.launch(REQUEST_PERMISSION)
+                                writeFile(finalResult)
+
+                            } else {
+                                permissionGranted.launch(REQUEST_PERMISSION)
+                            }
+                        }
+                    })
+                    builder.show()
+
+
                 }
 
             }
+        })
+
+    private val permissionGranted =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
 
         }
-    })
 
-    private val permissionGranted = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){granted ->
-
-    }
-
-    private fun writePermissionGranted() : Boolean{
-          return ContextCompat.checkSelfPermission(
+    private fun writePermissionGranted(): Boolean {
+        return ContextCompat.checkSelfPermission(
             this,
             REQUEST_PERMISSION[0]
         ) == PackageManager.PERMISSION_GRANTED &&
@@ -136,6 +157,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
-         val REQUEST_PERMISSION = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        const val DATE_PATTERN = "dd/MM/yyHH:mm:ss"
+        val REQUEST_PERMISSION = arrayOf(
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE
+        )
     }
 }
