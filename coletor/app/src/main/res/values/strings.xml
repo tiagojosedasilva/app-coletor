@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">My Application</string>
+    <string name="place_barcode">Aperte no botão abrir scanner abaixo.</string>
+    <string name="scan_auto">O scanning começará automaticamente.</string>
+    <string name="scan_now">Abrir Scanner</string>
+    <string name="insert_quantity">"Insira a quantidade: "</string>
+    <string name="readed_code">Código lido: %1s</string>
 </resources>

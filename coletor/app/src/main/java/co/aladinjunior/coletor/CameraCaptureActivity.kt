@@ -1,4 +1,4 @@
-package co.aladinjunior.myapplication
+package co.aladinjunior.coletor
 
 import com.journeyapps.barcodescanner.CaptureActivity
 

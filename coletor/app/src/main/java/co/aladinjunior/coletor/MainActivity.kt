@@ -1,4 +1,4 @@
-package co.aladinjunior.myapplication
+package co.aladinjunior.coletor
 
 import android.Manifest
 import android.content.DialogInterface
@@ -15,7 +15,7 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
-import co.aladinjunior.myapplication.databinding.ActivityMainBinding
+import co.aladinjunior.coletor.databinding.ActivityMainBinding
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanIntentResult
 import com.journeyapps.barcodescanner.ScanOptions
@@ -28,6 +28,7 @@ import java.util.*
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -108,24 +109,44 @@ class MainActivity : AppCompatActivity() {
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 )
                 editText.layoutParams = params
+                val resultArray = mutableListOf<String>()
+
+                editText.hint = "Pressione OK com o campo vazio para finalizar a coleta"
+                val readedCode = getString(R.string.readed_code, result?.contents)
+                val insertQuantity = getString(R.string.insert_quantity)
 
                 if (result?.contents != null) {
                     val builder = AlertDialog.Builder(this@MainActivity)
-                    builder.setTitle("quantidade")
+                    builder.setTitle(insertQuantity)
                     builder.setView(editText)
-                    builder.setMessage(result.contents)
+                    builder.setMessage(readedCode)
 
-                    builder.setPositiveButton("OK", object : DialogInterface.OnClickListener{
+
+
+                    builder.setPositiveButton(android.R.string.ok, object : DialogInterface.OnClickListener{
                         override fun onClick(dialog: DialogInterface?, which: Int) {
+
                             if (writePermissionGranted()) {
                                 var quantity = editText.text.toString()
                                 if (quantity.length < 2) {
                                     quantity = "0" + editText.text.toString()
                                 }
-                                val finalResult = result.contents + "0000" + quantity + "0000000" + date
-                                Log.d("file2", finalResult)
+                                
 
-                                writeFile(finalResult)
+                                    val finalResult = result.contents + "0000" + quantity + "0000000" + date
+                                    resultArray.add(finalResult)
+
+
+
+
+
+//                                val finalResult = result.contents + "0000" + quantity + "0000000" + date
+
+
+                                Log.d("file2", resultArray.toString())
+
+
+//                                writeFile(finalResult)
 
                             } else {
                                 permissionGranted.launch(REQUEST_PERMISSION)
