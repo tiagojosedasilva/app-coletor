@@ -1,7 +1,9 @@
 package co.aladinjunior.coletor
 
 import android.Manifest
+import android.content.Context
 import android.content.DialogInterface
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -28,22 +30,20 @@ import java.util.*
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private lateinit var sharedPreferences: SharedPreferences
+    private var archiveNum: Int
+        get() = sharedPreferences.getInt(ARCHIVE_NUMBER_KEY, 1)
+        set(value) = sharedPreferences.edit().putInt(ARCHIVE_NUMBER_KEY, value).apply()
+
+
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         writePermissionGranted()
-
-        Log.d("file", filesDir.path)
-        Log.d(
-            "file",
-            SimpleDateFormat(DATE_PATTERN, Locale.getDefault()).format(System.currentTimeMillis())
-        )
-
-
-
-
+        sharedPreferences = getSharedPreferences("ArquivoPrefs", Context.MODE_PRIVATE)
 
         binding.mainScanBttn.setOnClickListener {
             scan()
@@ -54,9 +54,11 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    private fun writeFile(content: String) {
-        val fileName = "arquivo.txt"
-//        val content = "Conteúdo do arquivo de texto. 2 "
+    val resultArray = mutableListOf<String>()
+
+    private fun writeFile(content: List<String>) {
+        val date = SimpleDateFormat(DATE_ARCHIVE, Locale.getDefault()).format(System.currentTimeMillis())
+        val fileName = "$date$archiveNum.txt"
 
         try {
             val downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
@@ -69,7 +71,10 @@ class MainActivity : AppCompatActivity() {
             val file = File(downloadsDir, fileName)
 
             FileOutputStream(file).use { outputStream ->
-                outputStream.write(content.toByteArray())
+                for (line in content) {
+                    outputStream.write("$line\n".toByteArray())
+                }
+
             }
 
             Toast.makeText(
@@ -77,8 +82,8 @@ class MainActivity : AppCompatActivity() {
                 "Arquivo criado e conteúdo escrito em: ${file.absolutePath}",
                 Toast.LENGTH_SHORT
             ).show()
+            archiveNum++
 
-            Log.d("file", "Arquivo criado e conteúdo escrito em: ${file.absolutePath}")
         } catch (e: Exception) {
             Toast.makeText(this, "Arquivo não criado", Toast.LENGTH_SHORT).show()
             Log.e("error", "Ocorreu um erro ao criar o arquivo: ${e.message}")
@@ -102,16 +107,19 @@ class MainActivity : AppCompatActivity() {
         ScanContract(),
         object : ActivityResultCallback<ScanIntentResult> {
             override fun onActivityResult(result: ScanIntentResult?) {
-                val date = SimpleDateFormat(DATE_PATTERN, Locale.getDefault()).format(System.currentTimeMillis())
+                val date = SimpleDateFormat(
+                    DATE_PATTERN,
+                    Locale.getDefault()
+                ).format(System.currentTimeMillis())
                 val editText = EditText(this@MainActivity)
                 val params = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 )
                 editText.layoutParams = params
-                val resultArray = mutableListOf<String>()
 
-                editText.hint = "Pressione OK com o campo vazio para finalizar a coleta"
+
+                editText.hint = getString(R.string.finish_collect)
                 val readedCode = getString(R.string.readed_code, result?.contents)
                 val insertQuantity = getString(R.string.insert_quantity)
 
@@ -122,37 +130,42 @@ class MainActivity : AppCompatActivity() {
                     builder.setMessage(readedCode)
 
 
+                    builder.setPositiveButton(
+                        android.R.string.ok,
+                        object : DialogInterface.OnClickListener {
+                            override fun onClick(dialog: DialogInterface?, which: Int) {
 
-                    builder.setPositiveButton(android.R.string.ok, object : DialogInterface.OnClickListener{
-                        override fun onClick(dialog: DialogInterface?, which: Int) {
+                                if (writePermissionGranted()) {
+                                    var quantity = editText.text.toString()
 
-                            if (writePermissionGranted()) {
-                                var quantity = editText.text.toString()
-                                if (quantity.length < 2) {
-                                    quantity = "0" + editText.text.toString()
+                                    if (quantity.isEmpty() && resultArray.isEmpty())
+                                        Toast.makeText(
+                                            this@MainActivity,
+                                            getString(R.string.first_item_quantity),
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    else if(quantity.isNotEmpty()){
+                                        if (quantity.length < 2) quantity = "0$quantity"
+
+                                        val finalResult = if (quantity.length == 3) {
+                                            "0${result.contents}${"0000".substring(1)}${quantity}0000000$date"
+                                        } else {
+                                            "0${result.contents}0000${quantity}0000000$date"
+                                        }
+                                        resultArray.add(finalResult)
+
+                                        Log.d("file2", resultArray.toString())
+                                        scan()
+                                    }
+                                    if (quantity.isEmpty() && resultArray.isNotEmpty())
+                                    writeFile(resultArray)
+
+
+                                } else {
+                                    permissionGranted.launch(REQUEST_PERMISSION)
                                 }
-                                
-
-                                    val finalResult = result.contents + "0000" + quantity + "0000000" + date
-                                    resultArray.add(finalResult)
-
-
-
-
-
-//                                val finalResult = result.contents + "0000" + quantity + "0000000" + date
-
-
-                                Log.d("file2", resultArray.toString())
-
-
-//                                writeFile(finalResult)
-
-                            } else {
-                                permissionGranted.launch(REQUEST_PERMISSION)
                             }
-                        }
-                    })
+                        })
                     builder.show()
 
 
@@ -178,6 +191,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
+        const val ARCHIVE_NUMBER_KEY = "archive_number_key"
+        const val DATE_ARCHIVE = "ddMM"
         const val DATE_PATTERN = "dd/MM/yyHH:mm:ss"
         val REQUEST_PERMISSION = arrayOf(
             Manifest.permission.READ_EXTERNAL_STORAGE,
