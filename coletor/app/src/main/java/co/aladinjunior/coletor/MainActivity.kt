@@ -2,9 +2,10 @@ package co.aladinjunior.coletor
 
 import android.Manifest
 import android.content.Context
-import android.content.DialogInterface
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Environment
@@ -12,14 +13,12 @@ import android.util.Log
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Toast
-import androidx.activity.result.ActivityResultCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import co.aladinjunior.coletor.databinding.ActivityMainBinding
 import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanIntentResult
 import com.journeyapps.barcodescanner.ScanOptions
 import java.io.File
 import java.io.FileOutputStream
@@ -54,7 +53,7 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    val resultArray = mutableListOf<String>()
+    private val resultArray = mutableListOf<String>()
 
     private fun writeFile(content: List<String>) {
         val date = SimpleDateFormat(DATE_ARCHIVE, Locale.getDefault()).format(System.currentTimeMillis())
@@ -83,6 +82,7 @@ class MainActivity : AppCompatActivity() {
                 Toast.LENGTH_SHORT
             ).show()
             archiveNum++
+            openDirectory()
 
         } catch (e: Exception) {
             Toast.makeText(this, "Arquivo não criado", Toast.LENGTH_SHORT).show()
@@ -104,80 +104,85 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val barLauncher: ActivityResultLauncher<ScanOptions> = registerForActivityResult(
-        ScanContract(),
-        object : ActivityResultCallback<ScanIntentResult> {
-            override fun onActivityResult(result: ScanIntentResult?) {
-                val date = SimpleDateFormat(
-                    DATE_PATTERN,
-                    Locale.getDefault()
-                ).format(System.currentTimeMillis())
-                val editText = EditText(this@MainActivity)
-                val params = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-                editText.layoutParams = params
+        ScanContract()
+    ) { result ->
+        val date = SimpleDateFormat(
+            DATE_PATTERN,
+            Locale.getDefault()
+        ).format(System.currentTimeMillis())
+        val editText = EditText(this@MainActivity)
+        val params = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+        editText.layoutParams = params
 
 
-                editText.hint = getString(R.string.finish_collect)
-                val readedCode = getString(R.string.readed_code, result?.contents)
-                val insertQuantity = getString(R.string.insert_quantity)
+        editText.hint = getString(R.string.finish_collect)
+        val readedCode = getString(R.string.readed_code, result?.contents)
+        val insertQuantity = getString(R.string.insert_quantity)
 
-                if (result?.contents != null) {
-                    val builder = AlertDialog.Builder(this@MainActivity)
-                    builder.setTitle(insertQuantity)
-                    builder.setView(editText)
-                    builder.setMessage(readedCode)
-
-
-                    builder.setPositiveButton(
-                        android.R.string.ok,
-                        object : DialogInterface.OnClickListener {
-                            override fun onClick(dialog: DialogInterface?, which: Int) {
-
-                                if (writePermissionGranted()) {
-                                    var quantity = editText.text.toString()
-
-                                    if (quantity.isEmpty() && resultArray.isEmpty())
-                                        Toast.makeText(
-                                            this@MainActivity,
-                                            getString(R.string.first_item_quantity),
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                    else if(quantity.isNotEmpty()){
-                                        if (quantity.length < 2) quantity = "0$quantity"
-
-                                        val finalResult = if (quantity.length == 3) {
-                                            "0${result.contents}${"0000".substring(1)}${quantity}0000000$date"
-                                        } else {
-                                            "0${result.contents}0000${quantity}0000000$date"
-                                        }
-                                        resultArray.add(finalResult)
-
-                                        Log.d("file2", resultArray.toString())
-                                        scan()
-                                    }
-                                    if (quantity.isEmpty() && resultArray.isNotEmpty())
-                                    writeFile(resultArray)
+        if (result?.contents != null) {
+            val builder = AlertDialog.Builder(this@MainActivity)
+            builder.setTitle(insertQuantity)
+            builder.setView(editText)
+            builder.setMessage(readedCode)
 
 
-                                } else {
-                                    permissionGranted.launch(REQUEST_PERMISSION)
-                                }
-                            }
-                        })
-                    builder.show()
+            builder.setPositiveButton(
+                android.R.string.ok
+            ) { _, _ ->
+                if (writePermissionGranted()) {
+                    var quantity = editText.text.toString()
+
+                    if (quantity.isEmpty() && resultArray.isEmpty())
+                        Toast.makeText(
+                            this@MainActivity,
+                            getString(R.string.first_item_quantity),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    else if (quantity.isNotEmpty()) {
+                        if (quantity.length < 2) quantity = "0$quantity"
+
+                        val finalResult = if (quantity.length == 3) {
+                            "0${result.contents}${"0000".substring(1)}${quantity}0000000$date"
+                        } else {
+                            "0${result.contents}0000${quantity}0000000$date"
+                        }
+                        resultArray.add(finalResult)
+
+                        scan()
+                    }
+                    if (quantity.isEmpty() && resultArray.isNotEmpty()) {
+                        writeFile(resultArray)
 
 
+                    }
+
+
+                } else {
+                    permissionGranted.launch(REQUEST_PERMISSION)
                 }
-
             }
-        })
+            builder.show()
 
-    private val permissionGranted =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
 
         }
+    }
+
+    private fun openDirectory(){
+
+        val downloadDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        val pathUri = Uri.parse(downloadDir?.path)
+        val intent = Intent(Intent.ACTION_VIEW)
+        intent.setDataAndType(pathUri, "*/*")
+        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+
+        startActivity(intent)
+    }
+
+    private val permissionGranted =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {}
 
     private fun writePermissionGranted(): Boolean {
         return ContextCompat.checkSelfPermission(
