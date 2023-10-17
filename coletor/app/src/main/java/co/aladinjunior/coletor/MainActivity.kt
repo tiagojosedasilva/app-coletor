@@ -1,15 +1,13 @@
 package co.aladinjunior.coletor
 
 import android.Manifest
-import android.content.Context
+import android.app.Activity
 import android.content.Intent
-import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.os.Environment
-import android.util.Log
+import android.text.InputType
+import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Toast
@@ -20,8 +18,6 @@ import androidx.core.content.ContextCompat
 import co.aladinjunior.coletor.databinding.ActivityMainBinding
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
-import java.io.File
-import java.io.FileOutputStream
 import java.lang.Exception
 import java.text.SimpleDateFormat
 import java.util.*
@@ -29,25 +25,19 @@ import java.util.*
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private lateinit var sharedPreferences: SharedPreferences
-    private var archiveNum: Int
-        get() = sharedPreferences.getInt(ARCHIVE_NUMBER_KEY, 1)
-        set(value) = sharedPreferences.edit().putInt(ARCHIVE_NUMBER_KEY, value).apply()
-
-
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         writePermissionGranted()
-        sharedPreferences = getSharedPreferences("ArquivoPrefs", Context.MODE_PRIVATE)
 
         binding.mainScanBttn.setOnClickListener {
             scan()
+        }
+        binding.mainSaveBttn.setOnClickListener {
 
-
+            createDocument()
         }
 
 
@@ -55,49 +45,11 @@ class MainActivity : AppCompatActivity() {
 
     private val resultArray = mutableListOf<String>()
 
-    private fun writeFile(content: List<String>) {
-        val date = SimpleDateFormat(DATE_ARCHIVE, Locale.getDefault()).format(System.currentTimeMillis())
-        val fileName = "$date$archiveNum.txt"
-
-        try {
-            val downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-
-
-            if (!downloadsDir!!.exists()) {
-                downloadsDir.mkdirs()
-            }
-
-            val file = File(downloadsDir, fileName)
-
-            FileOutputStream(file).use { outputStream ->
-                for (line in content) {
-                    outputStream.write("$line\n".toByteArray())
-                }
-
-            }
-
-            Toast.makeText(
-                this,
-                "Arquivo criado e conteúdo escrito em: ${file.absolutePath}",
-                Toast.LENGTH_SHORT
-            ).show()
-            archiveNum++
-            openDirectory()
-
-        } catch (e: Exception) {
-            Toast.makeText(this, "Arquivo não criado", Toast.LENGTH_SHORT).show()
-            Log.e("error", "Ocorreu um erro ao criar o arquivo: ${e.message}")
-        }
-    }
-
     private fun scan() {
         val options = ScanOptions().apply {
             setPrompt("Volume para cima para ligar o flash!")
             setBeepEnabled(true)
             setOrientationLocked(true)
-
-
-
             captureActivity = CameraCaptureActivity::class.java
         }
         barLauncher.launch(options)
@@ -116,9 +68,10 @@ class MainActivity : AppCompatActivity() {
             LinearLayout.LayoutParams.WRAP_CONTENT
         )
         editText.layoutParams = params
+        editText.inputType = InputType.TYPE_CLASS_NUMBER
 
 
-        editText.hint = getString(R.string.finish_collect)
+
         val readedCode = getString(R.string.readed_code, result?.contents)
         val insertQuantity = getString(R.string.insert_quantity)
 
@@ -142,6 +95,7 @@ class MainActivity : AppCompatActivity() {
                             Toast.LENGTH_LONG
                         ).show()
                     else if (quantity.isNotEmpty()) {
+                        binding.mainSaveBttn.visibility = View.VISIBLE
                         if (quantity.length < 2) quantity = "0$quantity"
 
                         val finalResult = if (quantity.length == 3) {
@@ -150,15 +104,9 @@ class MainActivity : AppCompatActivity() {
                             "0${result.contents}0000${quantity}0000000$date"
                         }
                         resultArray.add(finalResult)
-
-                        scan()
-                    }
-                    if (quantity.isEmpty() && resultArray.isNotEmpty()) {
-                        writeFile(resultArray)
-
+                        Toast.makeText(this@MainActivity, "Adicionado com sucesso", Toast.LENGTH_SHORT).show()
 
                     }
-
 
                 } else {
                     permissionGranted.launch(REQUEST_PERMISSION)
@@ -169,16 +117,36 @@ class MainActivity : AppCompatActivity() {
 
         }
     }
+    private val createDocumentLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uri = result.data?.data
+            try{
+                val outputStream = this.contentResolver.openOutputStream(uri!!)
+                for (line in resultArray){
+                    outputStream?.write("$line\n".toByteArray())
+                }
 
-    private fun openDirectory(){
+                outputStream?.close()
+            }catch (e: Exception){
+                e.printStackTrace()
+            }
 
-        val downloadDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-        val pathUri = Uri.parse(downloadDir?.path)
-        val intent = Intent(Intent.ACTION_VIEW)
-        intent.setDataAndType(pathUri, "*/*")
-        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+        } else {
+            Toast.makeText(this, "Ação cancelada ou falhou ao criar o documento", Toast.LENGTH_SHORT).show()
+        }
+    }
 
-        startActivity(intent)
+    private fun createDocument() {
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TITLE, "fileName.txt")
+
+        }
+
+        createDocumentLauncher.launch(intent)
     }
 
     private val permissionGranted =
@@ -196,8 +164,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
-        const val ARCHIVE_NUMBER_KEY = "archive_number_key"
-        const val DATE_ARCHIVE = "ddMM"
         const val DATE_PATTERN = "dd/MM/yyHH:mm:ss"
         val REQUEST_PERMISSION = arrayOf(
             Manifest.permission.READ_EXTERNAL_STORAGE,

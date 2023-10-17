@@ -7,4 +7,5 @@
     <string name="readed_code">Código lido: %1s</string>
     <string name="first_item_quantity">Você ainda não inseriu a quantidade do primeiro item.</string>
     <string name="finish_collect">Aperte OK com o campo vazio para finalizar a coleta</string>
+    <string name="save">Salvar</string>
 </resources>
