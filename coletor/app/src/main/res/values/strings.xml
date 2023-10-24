@@ -8,4 +8,6 @@
     <string name="first_item_quantity">Você ainda não inseriu a quantidade do primeiro item.</string>
     <string name="finish_collect">Aperte OK com o campo vazio para finalizar a coleta</string>
     <string name="save">Salvar</string>
+    <string name="existing_data">Já existem dados em memória.</string>
+    <string name="clean_data">Para limpar os dados, aperte no ícone de lixeira.</string>
 </resources>

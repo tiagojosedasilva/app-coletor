@@ -2,11 +2,15 @@ package co.aladinjunior.coletor
 
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.graphics.Color
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.text.InputType
+import android.util.Log
 import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -25,6 +29,8 @@ import java.util.*
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private lateinit var sharedPref: SharedPreferences
+    private var stringArray: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,11 +38,45 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         writePermissionGranted()
 
+        sharedPref = getSharedPreferences("MyPrefrerences", Context.MODE_PRIVATE)
+        stringArray = sharedPref.getString("array2", null)
+        val sharedList: MutableList<String>? = stringArray?.split(",")?.toMutableList()
+        with(binding) {
+            if (sharedList != null && sharedList.isNotEmpty()) {
+                mainDeleteBttn.visibility = View.VISIBLE
+                mainSaveBttn.visibility = View.VISIBLE
+                scanTxt.setTextColor(Color.RED)
+                scanTxt.text = getString(R.string.existing_data)
+                scanSubTxt.text = getString(R.string.clean_data)
+                mainDeleteBttn.setOnClickListener {
+                    resultArray.removeAll(sharedList)
+                    sharedList.clear()
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Dados foram excluídos com sucesso. Reinicie o aplicativo!",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    sharedPref.edit()
+                        .clear()
+                        .apply()
+
+                }
+                resultArray.addAll(sharedList)
+            } else {
+                null
+            }
+        }
+
+
+
+
         binding.mainScanBttn.setOnClickListener {
             scan()
         }
         binding.mainSaveBttn.setOnClickListener {
-
+            sharedPref.edit()
+                .clear()
+                .apply()
             createDocument()
         }
 
@@ -71,7 +111,6 @@ class MainActivity : AppCompatActivity() {
         editText.inputType = InputType.TYPE_CLASS_NUMBER
 
 
-
         val readedCode = getString(R.string.readed_code, result?.contents)
         val insertQuantity = getString(R.string.insert_quantity)
 
@@ -104,7 +143,19 @@ class MainActivity : AppCompatActivity() {
                             "0${result.contents}0000${quantity}0000000$date"
                         }
                         resultArray.add(finalResult)
-                        Toast.makeText(this@MainActivity, "Adicionado com sucesso", Toast.LENGTH_SHORT).show()
+                        if (resultArray.isNotEmpty()) {
+                            stringArray = resultArray.joinToString(",")
+                            sharedPref.edit()
+                                .putString("array2", stringArray)
+                                .apply()
+
+                        }
+                        Log.i("file", stringArray.toString())
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Adicionado com sucesso",
+                            Toast.LENGTH_SHORT
+                        ).show()
 
                     }
 
@@ -122,19 +173,23 @@ class MainActivity : AppCompatActivity() {
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val uri = result.data?.data
-            try{
+            try {
                 val outputStream = this.contentResolver.openOutputStream(uri!!)
-                for (line in resultArray){
+                for (line in resultArray) {
                     outputStream?.write("$line\n".toByteArray())
                 }
-
+                resultArray.clear()
                 outputStream?.close()
-            }catch (e: Exception){
+            } catch (e: Exception) {
                 e.printStackTrace()
             }
 
         } else {
-            Toast.makeText(this, "Ação cancelada ou falhou ao criar o documento", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this,
+                "Ação cancelada ou falhou ao criar o documento",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -162,6 +217,7 @@ class MainActivity : AppCompatActivity() {
                     REQUEST_PERMISSION[1]
                 ) == PackageManager.PERMISSION_GRANTED
     }
+
 
     companion object {
         const val DATE_PATTERN = "dd/MM/yyHH:mm:ss"
